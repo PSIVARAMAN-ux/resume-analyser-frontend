@@ -3,9 +3,16 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://resume-api-mn
 /**
  * Generic fetch wrapper to handle JSON responses and errors centrally.
  */
-async function fetchClient<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function fetchClient<T>(endpoint: string, options: RequestInit = {}, token?: string | null): Promise<T> {
+  const headers = new Headers(options.headers || {});
+  
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
     ...options,
+    headers,
   });
 
   if (!response.ok) {
@@ -35,7 +42,7 @@ export const apiService = {
   healthCheck: () => fetchClient<{ status: string; message: string }>('/health'),
   
   // Add /api to history
-  fetchHistory: () => fetchClient<ApplicationHistory[]>('/api/history'),
+  fetchHistory: (token: string) => fetchClient<ApplicationHistory[]>('/api/history', {}, token),
 
   // Add /api to enhance-jd
   enhanceJD: async (draftText: string) => {
@@ -48,7 +55,7 @@ export const apiService = {
     });
   },
   
-  generateApplication: async (file: File, jobDescription: string) => {
+  generateApplication: async (file: File, jobDescription: string, token: string) => {
     const formData = new FormData();
     formData.append('resume', file);
     formData.append('job_description', jobDescription);
@@ -73,6 +80,6 @@ export const apiService = {
     }>('/api/generate', {
       method: 'POST',
       body: formData,
-    });
+    }, token);
   }
 };

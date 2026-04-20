@@ -3,6 +3,7 @@ import { jsPDF } from 'jspdf';
 import { ResumeDropzone } from './components/ResumeDropzone';
 import { apiService, type ApplicationHistory } from './services/api';
 import { Sparkles, Loader2, Copy, CheckCircle2, Target, AlertCircle, Download, Lightbulb, MessageCircleQuestion, ChevronDown, Clock, X, Eye } from 'lucide-react';
+import { SignedIn, SignedOut, SignInButton, UserButton, useAuth } from "@clerk/clerk-react";
 
 const SUGGESTED_ROLES = [
   { title: "Backend Engineer", jd: "We are looking for a Backend Engineer to build scalable APIs and microservices handling millions of requests. Required: Python (FastAPI/Flask), PostgreSQL, Docker, AWS. Experience with RESTful architecture, system design, and optimizing database queries is essential." },
@@ -43,6 +44,8 @@ export default function App() {
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [copied, setCopied] = useState(false);
   const [expandedQ, setExpandedQ] = useState<number | null>(null);
+  
+  const { getToken } = useAuth();
 
   // Phase 4 States
   const [activeTab, setActiveTab] = useState<'NEW' | 'HISTORY'>('NEW');
@@ -55,7 +58,9 @@ export default function App() {
   const loadHistory = async () => {
     setIsHistoryLoading(true);
     try {
-       const data = await apiService.fetchHistory();
+       const token = await getToken();
+       if (!token) return;
+       const data = await apiService.fetchHistory(token);
        setHistoryData(data);
     } catch(err) {
        console.error("Failed to fetch history");
@@ -78,7 +83,12 @@ export default function App() {
     setError(null);
     
     try {
-      const data = await apiService.generateApplication(file, jobDescription);
+      const token = await getToken();
+      if (!token) {
+        setError('Authentication required to generate application.');
+        return;
+      }
+      const data = await apiService.generateApplication(file, jobDescription, token);
       setResult(data);
     } catch (err: any) {
       setError(err.message || 'Something went wrong during generation. Please check the backend connection.');
@@ -154,25 +164,56 @@ export default function App() {
             </h1>
           </div>
           
-          <div className="flex bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/60 shadow-inner">
-             <button 
-               onClick={() => { setActiveTab('NEW'); setSelectedRecord(null); }} 
-               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'NEW' ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
-             >
-               New Analysis
-             </button>
-             <button 
-               onClick={() => { setActiveTab('HISTORY'); loadHistory(); setSelectedRecord(null); }} 
-               className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'HISTORY' ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
-             >
-               My Applications
-             </button>
+          <div className="flex items-center space-x-6">
+            <div className="flex bg-gray-100/80 p-1.5 rounded-xl border border-gray-200/60 shadow-inner">
+               <button 
+                 onClick={() => { setActiveTab('NEW'); setSelectedRecord(null); }} 
+                 className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'NEW' ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
+               >
+                 New Analysis
+               </button>
+               <button 
+                 onClick={() => { setActiveTab('HISTORY'); loadHistory(); setSelectedRecord(null); }} 
+                 className={`px-4 py-1.5 rounded-lg text-sm font-semibold transition-all ${activeTab === 'HISTORY' ? 'bg-white text-gray-900 shadow-sm border border-gray-200/50' : 'text-gray-500 hover:text-gray-800'}`}
+               >
+                 My Applications
+               </button>
+            </div>
+          
+            {/* If the user is NOT logged in, show a Sign In button */}
+            <SignedOut>
+              <SignInButton mode="modal">
+                <button className="bg-gray-900 text-white px-5 py-2 rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm">
+                  Sign In
+                </button>
+              </SignInButton>
+            </SignedOut>
+
+            {/* If the user IS logged in, show their Profile Picture */}
+            <SignedIn>
+              <UserButton appearance={{ elements: { userButtonAvatarBox: "w-9 h-9 border border-gray-200" } }} />
+            </SignedIn>
           </div>
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-      
+        <SignedOut>
+          <div className="text-center py-24 bg-white rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center max-w-4xl mx-auto mt-10">
+            <div className="bg-fuchsia-50 p-4 rounded-2xl mb-6">
+              <Sparkles className="w-12 h-12 text-fuchsia-600" />
+            </div>
+            <h2 className="text-4xl font-bold tracking-tight mb-4 text-gray-900">Welcome to ResumeToJob AI</h2>
+            <p className="text-gray-500 text-lg max-w-xl mx-auto leading-relaxed mb-8">Please sign in to securely upload your base resume, perform deep ATS analysis against roles, and automatically generate hyper-targeted cover letters.</p>
+            <SignInButton mode="modal">
+              <button className="bg-gray-900 text-white px-8 py-3 rounded-xl text-md font-semibold hover:bg-gray-800 transition-colors shadow-sm">
+                Get Started
+              </button>
+            </SignInButton>
+          </div>
+        </SignedOut>
+
+        <SignedIn>
         {activeTab === 'NEW' ? (
         
           !result ? (
@@ -256,7 +297,7 @@ export default function App() {
           </div>
         ) : (
           /* ----- RESULTS MODE ----- */
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 animate-in fade-in slide-in-from-bottom-8 duration-500">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-start animate-in fade-in slide-in-from-bottom-8 duration-500">
             {/* AREA A: The ATS Report */}
             <div className="lg:col-span-5 flex flex-col space-y-6">
               
@@ -428,7 +469,7 @@ export default function App() {
             </div>
 
             {/* AREA B: The Deliverable */}
-            <div className="lg:col-span-7 flex flex-col">
+            <div className="lg:col-span-7 flex flex-col sticky top-24 h-fit">
               <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-8 flex-1 flex flex-col">
                 <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-100">
                   <div>
@@ -514,6 +555,7 @@ export default function App() {
             )}
           </div>
         )}
+        </SignedIn>
       </main>
 
       {/* History Detail Modal */}
