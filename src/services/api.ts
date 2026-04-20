@@ -27,13 +27,19 @@ export interface ApplicationHistory {
 /**
  * Endpoint Definitions
  */
+/**
+ * Endpoint Definitions
+ */
 export const apiService = {
+  // healthCheck stays at root because it is defined outside the api_router in main.py
   healthCheck: () => fetchClient<{ status: string; message: string }>('/health'),
   
-  fetchHistory: () => fetchClient<ApplicationHistory[]>('/history'),
+  // Add /api to history
+  fetchHistory: () => fetchClient<ApplicationHistory[]>('/api/history'),
 
+  // Add /api to enhance-jd
   enhanceJD: async (draftText: string) => {
-    return fetchClient<{ enhanced_text: string }>('/enhance-jd', {
+    return fetchClient<{ enhanced_text: string }>('/api/enhance-jd', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -47,7 +53,7 @@ export const apiService = {
     formData.append('resume', file);
     formData.append('job_description', jobDescription);
     
-    // Note: Do not set Content-Type header on FormData requests. 
+    // Add /api to generate
     return fetchClient<{ 
       match_score: number; 
       analysis_summary: string;
@@ -64,7 +70,7 @@ export const apiService = {
         how_to_answer: string;
       }[];
       cover_letter: string; 
-    }>('/generate', {
+    }>('/api/generate', {
       method: 'POST',
       body: formData,
     });
